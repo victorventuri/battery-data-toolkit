@@ -193,8 +193,8 @@ class AuroraExtractor(BatteryDataExtractor):
         df_out['cycle_number'] = df['Cycle Index'] + start_cycle - \
                                 df['Cycle Index'].min()
         df_out['cycle_number'] = df_out['cycle_number'].astype('int64')
-        df_out['test_time'] = np.array(df['Test Time (s)'] - \
-                            df['Test Time (s)'][0] + start_time, dtype=float)
+        df_out['test_time'] = np.array(df['Test Time (s)'] + \
+                                start_time, dtype=float)
         df_out['current'] = df['Current (A)']
         df_out['voltage'] = df['Voltage (V)']
         df_out['step_index'] = df['Step Index']
