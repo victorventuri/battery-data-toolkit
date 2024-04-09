@@ -105,15 +105,14 @@ class AuroraExtractor(BatteryDataExtractor):
         # Read the file and rename the file
         df = pd.read_excel(file, sheet_name = sheet)
 
-        # First, convert Date_time to UNIX timestamps
-        unix_timestamps = []
-        for datetime in df['Date_Time'].values:
-            unix_timestamps.append(pd.Timestamp(datetime).timestamp())
-        # convert to numpy
-        unix_timestamps = np.array(unix_timestamps)
-        # subtract cycle durations to find out start time 
-        cycle_starts = unix_timestamps - df['Test Time (s)'].to_numpy() 
-        cycle_starts += start_time # considering the start time
+        # First, let us do a little manipulation to get the cycle duration and 
+        # end times 
+        cycle_ends = df['Test Time (s)'].to_numpy()
+        # The cycle durations come from the diffs
+        cycle_dur = cycle_ends.copy()
+        cycle_dur[1:] = np.diff(cycle_ends)
+        # Including start time
+        cycle_ends += start_time
 
         # Create fresh DataFrame
         df_out = pd.DataFrame()
@@ -121,14 +120,13 @@ class AuroraExtractor(BatteryDataExtractor):
         # Convert column names 
         df_out['cycle_number'] = df['Cycle Index'] + start_cycle - \
                                 df['Cycle Index'].min()
-        df_out['cycle_start'] = cycle_starts
-        df_out['cycle_duration'] = df['Test Time (s)']
+        df_out['cycle_end_time'] = cycle_ends # cycle_starts
+        df_out['cycle_duration'] = cycle_dur # df['Test Time (s)']
         df_out['discharge_capacity'] = df['Discharge Capacity (Ah)']
         df_out['charge_capacity'] = df['Charge Capacity (Ah)']
         df_out['coulomb_efficiency'] = df['Coulombic Efficiency (%)']
-        # Remember to convert the energy to Joule
-        df_out['discharge_energy'] = df['Discharge Energy (Wh)'].to_numpy() / 3600
-        df_out['charge_energy'] = df['Charge Energy (Wh)'].to_numpy() / 3600
+        df_out['discharge_energy'] = df['Discharge Energy (Wh)']
+        df_out['charge_energy'] = df['Charge Energy (Wh)']
         df_out['file_number'] = file_number
 
         # Check if we need to drop problematic cycles 
@@ -145,7 +143,7 @@ class AuroraExtractor(BatteryDataExtractor):
 
         return df_out, \
                 df_out['cycle_number'].max(), \
-                unix_timestamps.max()       
+                cycle_ends.max()    
 
     def generate_dataframe(self, 
                            file: str, 
