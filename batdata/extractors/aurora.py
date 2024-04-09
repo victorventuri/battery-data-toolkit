@@ -131,6 +131,18 @@ class AuroraExtractor(BatteryDataExtractor):
         df_out['charge_energy'] = df['Charge Energy (Wh)'].to_numpy() / 3600
         df_out['file_number'] = file_number
 
+        # Check if we need to drop problematic cycles 
+        problematic_cycles = getattr(self, '_temp_prob_cyc', [])
+        if len(problematic_cycles):
+            df_out.drop(\
+                df_out.loc[\
+                    df_out['cycle_number'].isin(problematic_cycles)].index, \
+                    inplace=True)
+        try:
+            delattr(self, '_temp_prob_cyc')
+        except AttributeError:
+            pass
+
         return df_out, \
                 df_out['cycle_number'].max(), \
                 unix_timestamps.max()       
@@ -201,6 +213,18 @@ class AuroraExtractor(BatteryDataExtractor):
         df_out['temperature'] = temps
         df_out['internal_resistance'] = df['Internal Resistance (Ohm)']
         df_out['file_number'] = file_number  # df_out['cycle_number']*0
+
+        # Now, for some reason, occasionally, prior to an RPT, the data contains
+        # an "ghost" cycle with a single entry in the I&V(t) values, and with 
+        # zero current. Therefore, it is safe for us to attribute it to the 
+        # previous cycle (and deal with the cycle_stats issue separately)
+        grouped = df_out.groupby('cycle_number')
+        problematic_cycles = df_out.loc[grouped.filter(\
+                            lambda x: len(x) == 1).index, \
+                             'cycle_number'].to_list()
+        self._temp_prob_cyc = problematic_cycles
+        df_out.loc[df_out['cycle_number'].isin(problematic_cycles), \
+                                    'cycle_number'] -= 1  
         
         # Drop the duplicate rows
         df_out = drop_cycles(df_out)
